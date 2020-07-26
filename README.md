@@ -8,7 +8,7 @@ Chord-like sounds with a ribbon controller.
   - Type : Open
 - ARP
   - On/Latch
-  - Arpegglator setting : Octave
+  - Arpegglator setting : Octave (= Default)
 
 ## How to play
 Change these parameters.
