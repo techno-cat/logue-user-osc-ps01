@@ -30,12 +30,12 @@ static VoiceBlock *activeBlocks[NUMBER_OF_VOICE];
 
 static struct {
   int16_t shape = 0;
-  int16_t shiftshape = 0; // = Release
+  int16_t shiftshape = 0; // = Release Time
   int16_t chord = 0;
 } s_param;
 
 static struct {
-  int32_t shape_lfo = 0; // = shape_lfo
+  int32_t shape_lfo = 0; // = OSC_CYCLEで更新したshape_lfo
 } s_modulation;
 
 #define LCW_SOFT_CLIP_FRAC_BITS (16 - LCW_CLIP_CURVE_FRAC_BITS)
@@ -119,7 +119,7 @@ void OSC_CYCLE(const user_osc_param_t * const params,
                int32_t *yn,
                const uint32_t frames)
 {
-  // サンプリング相応の処理（ノートオン時に参照する）
+  // Shapeに対するLFOの値をサンプリング（ノートオン時に参照する）
   s_modulation.shape_lfo = params->shape_lfo;
 
   const uint32_t egReleaseParam =
