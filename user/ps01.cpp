@@ -11,7 +11,7 @@ This software is released under the MIT License, see LICENSE.txt.
 #include "LCWEgReleaseTable.h"
 
 typedef struct {
-  int32_t note;
+  int32_t noteNo;
   uint32_t t;
   uint32_t dt;
   uint32_t gateTime;
@@ -57,35 +57,20 @@ __fast_inline int32_t softClip(SQ15_16 src)
   return ( src < 0 ) ? -ret : ret;
 }
 
-static void noteOff(const user_osc_param_t * const params)
+static int32_t noteOff(int32_t noteNo)
 {
-  const int32_t note = (int32_t)params->pitch >> 8;
   for (int32_t i=0; i<NUMBER_OF_VOICE; i++) {
     // memo:
+    // 本来の処理は、
     // 見つかったblockをgateTimeを過ぎているblockの手前に移動して、Releaseに移行
-    if ( activeBlocks[i]->note == note ) {
+    if ( activeBlocks[i]->noteNo == noteNo ) {
         VoiceBlock *block = activeBlocks[i];
         block->trigger = 0;
-
-        // memo:
-        // gateTimeを過ぎているグループ内で先頭に配置
-        int32_t pos = i;
-        for (int32_t j=(i + 1); j<NUMBER_OF_VOICE; j++) {
-            if ( !activeBlocks[j]->trigger ) {
-                break;
-            }
-
-            // memo:
-            // まだキーが押されている（gateTimeが終わっていない）
-            activeBlocks[j-1] = activeBlocks[j];
-            pos = j;
-        }
-
-        activeBlocks[pos] = block;
-
-        break;
+        return i;
     }
   }
+
+  return -1;
 }
 
 static void noteOffAll(void)
@@ -102,7 +87,7 @@ void OSC_INIT(uint32_t platform, uint32_t api)
 {
   for (int32_t i=0; i<NUMBER_OF_VOICE; i++) {
     VoiceBlock *p = &(voiceBlocks[0]) + i;
-    p->note = 0;
+    p->noteNo = 0;
     p->t = 0;
     p->dt = 0;
     p->trigger = 0;
@@ -191,37 +176,50 @@ void OSC_NOTEON(const user_osc_param_t * const params)
     return;
   }
 
-  // s11.20に拡張してから、整数部がoctaveになるように加工
-  int32_t pitch = (int32_t)params->pitch << 12;
-  pitch = (pitch - (LCW_NOTE_NO_A4 << 20)) / 12;
+  const int16_t *noteDeltaTable = &(chordTable[s_param.chord].table[0]);
+  const int32_t n = chordTable[s_param.chord].n;
+
+  // 四捨五入でノートNo.を確定
+  const int32_t noteNo0 = ((int32_t)params->pitch + 0x80) >> 8;
 
   // -4oct 〜 +4octにクリップすると同時に、正の数になるようにオフセット
   SQ15_16 tmp = (s_modulation.shape_lfo >> 20) * (s_param.shape >> 4);
   tmp = clipminmaxi32( 0, tmp + LCW_SQ15_16(4.0), LCW_SQ15_16(8.0) );
 
-  const int16_t *noteDeltaTable = &(chordTable[s_param.chord].table[0]);
-  const int32_t n = chordTable[s_param.chord].n;
-
   // テーブルにマッピング
-  const int32_t noteDelta = noteDeltaTable[ ((tmp & 0xFFFF) * n) >> 16 ];
-  const int32_t offset = ((tmp >> 16) * 12) + noteDelta - (4 * 12);
-  pitch += ((1 << 20) * offset) / 12;
+  const int32_t delta = noteDeltaTable[ ((tmp & 0xFFFF) * n) >> 16 ];
+  const int32_t offset = ((tmp >> 16) * 12) - (4 * 12);
+  const int32_t noteNo = noteNo0 + delta + offset;
+
+  // s11.20に拡張してから、整数部がoctaveになるように加工
+  int32_t pitch = ((noteNo - LCW_NOTE_NO_A4) << 20) / 12;
 
   // memo:
   // 最後に使用したblockが先頭にくるように並び替え
+  int32_t pos = noteOff( noteNo );
   VoiceBlock *block = activeBlocks[0];
-  for (int32_t i=1; i<NUMBER_OF_VOICE; i++) {
+  if ( pos < 0 ) {
+    for (int32_t i=1; i<NUMBER_OF_VOICE; i++) {
       if ( !block->isAlive ) {
-          break;
+        break;
       }
 
       // 鳴り終わってないblockを1つずつ下にずらしていく
       VoiceBlock *tmp = activeBlocks[i];
       activeBlocks[i] = block;
       block = tmp;
+    }
+  }
+  else {
+    for (int32_t i=1; i<=pos; i++) {
+      // 同じノートNo.のblockを確保できるまで、1つずつ下にずらしていく
+      VoiceBlock *tmp = activeBlocks[i];
+      activeBlocks[i] = block;
+      block = tmp;
+    }
   }
 
-  block->note = (int32_t)params->pitch >> 8;
+  block->noteNo = noteNo;
   block->dt = pitch_to_timer_delta(pitch >> (20 - 16));
   block->trigger = 1;
   block->isAlive = 1;
