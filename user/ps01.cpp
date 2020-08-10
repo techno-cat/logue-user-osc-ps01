@@ -185,14 +185,11 @@ void OSC_NOTEON(const user_osc_param_t * const params)
   // 四捨五入でノートNo.を確定
   const int32_t noteNo0 = ((int32_t)params->pitch + 0x80) >> 8;
 
-  // -4oct 〜 +4octにクリップすると同時に、正の数になるようにオフセット
-  SQ15_16 tmp = (s_modulation.shape_lfo >> 20) * (s_param.shape >> 4);
-  tmp = clipminmaxi32( 0, tmp + LCW_SQ15_16(4.0), LCW_SQ15_16(8.0) );
-
   // テーブルにマッピング
-  const int32_t delta = noteDeltaTable[ ((tmp & 0xFFFF) * n) >> 16 ];
-  const int32_t offset = ((tmp >> 16) * 12) - (4 * 12);
-  const int32_t noteNo = noteNo0 + delta + offset;
+  const SQ15_16 tmp = (s_modulation.shape_lfo >> 20) * (s_param.shape >> 3);
+  const SQ15_16 frac = (SQ15_16)((uint32_t)tmp & 0xFFFF);
+  const int32_t delta = noteDeltaTable[(frac * n) >> 16] + ((tmp >> 16) * 12);
+  const int32_t noteNo = noteNo0 + delta;
 
   // s11.20に拡張してから、整数部がoctaveになるように加工
   int32_t pitch = ((noteNo - LCW_NOTE_NO_A4) << 20) / 12;
