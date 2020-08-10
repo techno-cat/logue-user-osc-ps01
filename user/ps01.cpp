@@ -32,6 +32,7 @@ static struct {
   int16_t shape = 0;
   int16_t shiftshape = 0; // = Release Time
   int16_t chord = 0;
+  int16_t mode = 0;
 } s_param;
 
 static struct {
@@ -65,8 +66,10 @@ static int32_t noteOff(int32_t noteNo)
     // 見つかったblockをgateTimeを過ぎているblockの手前に移動して、Releaseに移行
     if ( activeBlocks[i]->noteNo == noteNo ) {
         VoiceBlock *block = activeBlocks[i];
-        block->trigger = 0;
-        return i;
+        if ( block->isAlive ) {
+          block->trigger = 0;
+          return i;
+        }
     }
   }
 
@@ -211,6 +214,10 @@ void OSC_NOTEON(const user_osc_param_t * const params)
     }
   }
   else {
+    if ( s_param.mode ) {
+      return;
+    }
+
     for (int32_t i=1; i<=pos; i++) {
       // 同じノートNo.のblockを確保できるまで、1つずつ下にずらしていく
       VoiceBlock *tmp = activeBlocks[i];
@@ -247,6 +254,9 @@ void OSC_PARAM(uint16_t index, uint16_t value)
     break;
   case k_user_osc_param_id1:
     s_param.chord = (int16_t)value;
+    break;
+  case k_user_osc_param_id2:
+    s_param.mode = (int16_t)value;
     break;
   default:
     break;

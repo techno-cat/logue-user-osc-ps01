@@ -6,11 +6,12 @@
         "api" : "1.1-0",
         "dev_id" : 0,
         "prg_id" : 0,
-        "version" : "0.9-3",
+        "version" : "0.9-4",
         "name" : "ps01",
-        "num_param" : 1,
+        "num_param" : 2,
         "params" : [
-            ["Chrd",   0,  4,  ""]
+            ["Chrd",   0,  4,  ""],
+            ["Mode",   0,  1,  ""]
         ]
     }
 }
