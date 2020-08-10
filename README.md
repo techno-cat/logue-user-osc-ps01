@@ -27,6 +27,8 @@ Range of arpegglator.
 Release time.
 - parameter 1  
 Chord Type (1 .. 5)
+- parameter 2  
+Mode(Voice Assign) (1 .. 2)
 
 # How to build
 1. Clone (or download) and setup [logue-sdk](https://github.com/korginc/logue-sdk).
